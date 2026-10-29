@@ -11,25 +11,22 @@ on:
 
 jobs:
   build:
-    strategy:
-      matrix:
-        go:
-          - '1.21'
-          - '1.22'
-          - '1.23'
-          - '1.24'
-          - '1.25'
-          - '1.26'
-
     runs-on: ubuntu-latest
     steps:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v3
 
-      - name: Set up Go ${{ matrix.go }}
+      # go.mod requires Go 1.26, so older versions only downloaded the
+      # 1.26.0 toolchain and tested the same thing. Use the latest patch
+      # release of the version go.mod declares instead.
+      - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: ${{ matrix.go }}
+          go-version-file: go.mod
+          check-latest: true
+
+      - name: Go vet
+        run: make vet
 
       - name: Go test
         run: make test
