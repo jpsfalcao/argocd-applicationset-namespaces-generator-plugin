@@ -6,6 +6,35 @@ It can be used as ArgoCD ApplicationSet plugin https://argo-cd.readthedocs.io/en
 
 It can discover existing namespaces in the cluster to produce an app per each namespace.
 
+# Output
+
+Each namespace produces its name and labels. `labels` is always an object,
+never `null`. Annotations are not returned.
+
+```json
+{
+  "namespace": "team-a",
+  "labels": { "kubernetes.io/metadata.name": "team-a", "example.com/tier": "s" }
+}
+```
+
+With `goTemplate: true`, read labels with `index`, since label keys contain
+dots and slashes: `{{ index .labels "example.com/tier" }}`. With
+`goTemplate: false`, Argo CD flattens them to `labels.<key>` strings.
+
+`index` on a missing key renders `<no value>` without an error, even with
+`goTemplateOptions: ["missingkey=error"]`. Make sure every namespace the
+generator returns has the labels you use, either with the `labelSelector`
+(`Exists` or `In`) or with an explicit check in the template:
+
+```yaml
+'{{ if not (hasKey .labels "example.com/tier") }}{{ fail "missing tier label" }}{{ end }}'
+```
+
+Label values come from whoever can label namespaces, so treat them as input:
+restrict accepted values with the `labelSelector` (`In`), and control who may
+set the labels (RBAC or an admission policy).
+
 # Assumptions and prerequisites
 
 - You are using JWT authentication to your clusters (i.e. Downward API tokens mounted to pods)
