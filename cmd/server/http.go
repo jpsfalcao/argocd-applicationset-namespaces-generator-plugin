@@ -22,8 +22,12 @@ type ServiceRequest struct {
 	Input              *PluginInput `json:"input,omitempty"`
 }
 
+// Labels is always an object (never null). Annotations are deliberately not
+// returned: they are free-form, can be large, and Argo CD logs generator
+// params on template errors.
 type ResponseParameters struct {
-	Namespace *string `json:"namespace,omitempty"`
+	Namespace *string           `json:"namespace,omitempty"`
+	Labels    map[string]string `json:"labels"`
 }
 
 // getClient is a variable so tests can substitute a fake clientset.
@@ -123,12 +127,17 @@ func (c *ServerConfig) secretsHandler(ctx context.Context) func(http.ResponseWri
 		}
 
 		for _, ns := range namespaces.Items {
+			labels := ns.Labels
+			if labels == nil {
+				labels = map[string]string{}
+			}
 			output.Output.Parameters = append(output.Output.Parameters, &ResponseParameters{
 				Namespace: &ns.Name,
+				Labels:    labels,
 			})
 		}
 
-		slog.Debug("Returning response", "address", r.RemoteAddr, "output", output)
+		slog.Debug("Returning response", "address", r.RemoteAddr, "namespaces", len(output.Output.Parameters))
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(output); err != nil {
 			slog.Error("Failed to encode response", "address", r.RemoteAddr, "error", err)

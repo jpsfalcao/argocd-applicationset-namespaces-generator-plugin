@@ -97,3 +97,52 @@ func TestLabelSelector(t *testing.T) {
 		})
 	}
 }
+
+func TestReturnsLabels(t *testing.T) {
+	useFakeClient(t,
+		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+			Name:        "team-a",
+			Labels:      map[string]string{"example.com/tier": "s"},
+			Annotations: map[string]string{"example.com/secret-ish": "x"},
+		}},
+		namespace("unlabelled", nil),
+	)
+
+	rec := post(t, &ServerConfig{ListenToken: "t"}, "t", `{"input":{"parameters":{}}}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body)
+	}
+
+	var got struct {
+		Output struct {
+			Parameters []map[string]any `json:"parameters"`
+		} `json:"output"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	byName := map[string]map[string]any{}
+	for _, p := range got.Output.Parameters {
+		byName[p["namespace"].(string)] = p
+	}
+
+	a := byName["team-a"]
+	if a == nil {
+		t.Fatalf("team-a missing: %s", rec.Body)
+	}
+	if tier := a["labels"].(map[string]any)["example.com/tier"]; tier != "s" {
+		t.Errorf("tier label = %v, want s", tier)
+	}
+	if _, ok := a["annotations"]; ok {
+		t.Errorf("annotations must not be returned: %s", rec.Body)
+	}
+
+	// A namespace without labels must get an empty object, not null.
+	u := byName["unlabelled"]
+	if u == nil {
+		t.Fatalf("unlabelled missing: %s", rec.Body)
+	}
+	if _, ok := u["labels"].(map[string]any); !ok {
+		t.Errorf("labels = %#v, want empty object", u["labels"])
+	}
+}
