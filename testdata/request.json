@@ -2,7 +2,9 @@
     "input": {
         "parameters": {
             "labelSelector": {
-                "project": "hsiaoairplane"
+                "matchLabels": {
+                    "project": "hsiaoairplane"
+                }
             }
         }
     }
