@@ -14,7 +14,16 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
+// GetClient returns a clientset that is built once and then reused. The
+// rest.Config re-reads rotated service account tokens on its own.
 func (c *ServerConfig) GetClient(req *PluginParameters) (kubernetes.Interface, error) {
+	c.clientOnce.Do(func() {
+		c.client, c.clientErr = c.newClient()
+	})
+	return c.client, c.clientErr
+}
+
+func (c *ServerConfig) newClient() (kubernetes.Interface, error) {
 	var config *rest.Config
 	var err error
 
@@ -38,7 +47,10 @@ func (c *ServerConfig) GetClient(req *PluginParameters) (kubernetes.Interface, e
 			return nil, err
 		}
 	} else {
-		config = ctrl.GetConfigOrDie()
+		config, err = ctrl.GetConfig()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return kubernetes.NewForConfig(config)
