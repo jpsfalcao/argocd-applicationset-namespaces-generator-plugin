@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -34,6 +35,17 @@ type ResponseBody struct {
 	Output *ResponseOutput `json:"output,omitempty"`
 }
 
+// authorized checks the bearer token in constant time. Without a configured
+// token, requests are only accepted in --local (debugging) mode.
+func (c *ServerConfig) authorized(r *http.Request) bool {
+	if c.ListenToken == "" {
+		return c.Local
+	}
+	got := []byte(r.Header.Get("Authorization"))
+	want := []byte("Bearer " + c.ListenToken)
+	return subtle.ConstantTimeCompare(got, want) == 1
+}
+
 func (c *ServerConfig) secretsHandler(ctx context.Context) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		slog.Debug("Received request", "address", r.RemoteAddr, "method", r.Method, "url", r.URL.String(), "content-type", r.Header.Get("Content-Type"))
@@ -49,7 +61,7 @@ func (c *ServerConfig) secretsHandler(ctx context.Context) func(http.ResponseWri
 			_, _ = w.Write([]byte("Unsupported media type"))
 			return
 		}
-		if c.ListenToken != "" && r.Header.Get("Authorization") != "Bearer "+c.ListenToken {
+		if !c.authorized(r) {
 			slog.Debug("Unauthorized", "address", r.RemoteAddr, "url", r.URL.String())
 			w.WriteHeader(http.StatusUnauthorized)
 			_, _ = w.Write([]byte("Unauthorized"))

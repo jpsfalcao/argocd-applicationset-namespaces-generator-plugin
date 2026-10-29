@@ -10,6 +10,7 @@ It can discover existing namespaces in the cluster to produce an app per each na
 
 - You are using JWT authentication to your clusters (i.e. Downward API tokens mounted to pods)
 - If using external clusters, you must populate cluster annotation with its Certificate Authority
+- A bearer token is required (`--listen-token` or `ARGOCD_APPLICATIONSET_NAMESPACES_PLUGIN_LISTEN_TOKEN`); the server refuses to start without one, except with `--local`
 
 # Usage
 
